@@ -36,6 +36,13 @@ func tokenizeCommand(cmd string) (map[string]string, error) {
 			tokens["speed"] = cmd[1:3]
 			cmd = cmd[3:]
 
+		case 'm': // mince takes two arguments
+			if len(cmd) < 3 {
+				return tokens, errors.New("invalid command format")
+			}
+			tokens["mince"] = cmd[1:3]
+			cmd = cmd[3:]
+
 		case 'p':
 			if len(cmd) < 2 {
 				return tokens, errors.New("invalid command format")
@@ -123,6 +130,27 @@ func ParseCommand(cmd string) []func(*Chain) {
 
 		commandEffects = append(commandEffects, func(c *Chain) {
 			c.SetSpeed(float64(n) / float64(d))
+		})
+	}
+
+	if val, ok := tokMap["mince"]; ok {
+		chr, _ := utf8.DecodeRuneInString(val)
+		size, err := charToBase36Int(chr)
+		if err != nil {
+			fmt.Println(err)
+			return commandEffects
+		}
+		val = val[1:]
+
+		chr, _ = utf8.DecodeRuneInString(val)
+		interval, err := charToBase36Int(chr)
+		if err != nil {
+			fmt.Println(err)
+			return commandEffects
+		}
+
+		commandEffects = append(commandEffects, func(c *Chain) {
+			c.Remince(size, interval)
 		})
 	}
 
