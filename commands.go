@@ -81,21 +81,33 @@ func charToBase36Int(chr rune) (int, error) {
 	return 0, errors.New("invalid base-36 numeral")
 }
 
-func ParseCommand(cmd string) []func(*Chain) {
+func ParseCommand(cmd string) (int, []func(*Chain)) {
 	commandEffects := make([]func(*Chain), 0)
 
 	tokMap, err := tokenizeCommand(strings.ToLower(cmd))
 	if err != nil {
 		fmt.Println(err)
-		return commandEffects
+		return 0, commandEffects
 	}
 
+	// first get chain index
+	var chain int
+	if val, ok := tokMap["chain"]; ok {
+		chr, _ := utf8.DecodeRuneInString(val)
+		chain, err = charToBase36Int(chr)
+		if err != nil {
+			fmt.Print(err)
+			return 0, commandEffects
+		}
+	}
+
+	// check if command included a chop selection
 	if val, ok := tokMap["chop"]; ok {
 		chr, _ := utf8.DecodeRuneInString(val)
 		chopIdx, err := charToBase36Int(chr)
 		if err != nil {
 			fmt.Println(err)
-			return commandEffects
+			return chain, commandEffects
 		}
 
 		commandEffects = append(commandEffects, func(c *Chain) {
@@ -103,17 +115,18 @@ func ParseCommand(cmd string) []func(*Chain) {
 		})
 	}
 
+	// check if command included speed modification
 	if val, ok := tokMap["speed"]; ok {
 		// get the ratio of the two values provided for new speed
 		chr, _ := utf8.DecodeRuneInString(val)
 		n, err := charToBase36Int(chr)
 		if err != nil {
 			fmt.Println(err)
-			return commandEffects
+			return chain, commandEffects
 		}
 		if n == 0 {
 			fmt.Println("cannot play at speed of 0")
-			return commandEffects
+			return chain, commandEffects
 		}
 		val = val[1:]
 
@@ -121,11 +134,11 @@ func ParseCommand(cmd string) []func(*Chain) {
 		d, err := charToBase36Int(chr)
 		if err != nil {
 			fmt.Println(err)
-			return commandEffects
+			return chain, commandEffects
 		}
 		if d == 0 {
 			fmt.Println("cannot divide by zero")
-			return commandEffects
+			return chain, commandEffects
 		}
 
 		commandEffects = append(commandEffects, func(c *Chain) {
@@ -133,12 +146,13 @@ func ParseCommand(cmd string) []func(*Chain) {
 		})
 	}
 
+	// check if command included mince modification
 	if val, ok := tokMap["mince"]; ok {
 		chr, _ := utf8.DecodeRuneInString(val)
 		size, err := charToBase36Int(chr)
 		if err != nil {
 			fmt.Println(err)
-			return commandEffects
+			return chain, commandEffects
 		}
 		val = val[1:]
 
@@ -146,7 +160,7 @@ func ParseCommand(cmd string) []func(*Chain) {
 		interval, err := charToBase36Int(chr)
 		if err != nil {
 			fmt.Println(err)
-			return commandEffects
+			return chain, commandEffects
 		}
 
 		commandEffects = append(commandEffects, func(c *Chain) {
@@ -154,12 +168,13 @@ func ParseCommand(cmd string) []func(*Chain) {
 		})
 	}
 
+	// check if command included pan modification
 	if val, ok := tokMap["pan"]; ok {
 		chr, _ := utf8.DecodeRuneInString(val)
 		p, err := charToBase36Int(chr)
 		if err != nil {
 			fmt.Println(err)
-			return commandEffects
+			return chain, commandEffects
 		}
 
 		// convert from integer in range [0-32] to float in range [-1,1]
@@ -175,12 +190,13 @@ func ParseCommand(cmd string) []func(*Chain) {
 		})
 	}
 
+	// check if command included volume modification
 	if val, ok := tokMap["volume"]; ok {
 		chr, _ := utf8.DecodeRuneInString(val)
 		v, err := charToBase36Int(chr)
 		if err != nil {
 			fmt.Println(err)
-			return commandEffects
+			return chain, commandEffects
 		}
 
 		// convert from integer in range [0-32] to float in range [0, 1]
@@ -196,5 +212,5 @@ func ParseCommand(cmd string) []func(*Chain) {
 		})
 	}
 
-	return commandEffects
+	return chain, commandEffects
 }

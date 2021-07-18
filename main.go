@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/speaker"
-	"github.com/faiface/beep/wav"
 )
 
 const UDP_PORT = 34567
@@ -38,33 +36,29 @@ func main() {
 
 	go listenUDPMessages(c)
 
-	// open sound file
-	f, err := os.Open("breaks/Intelligent Junglist.wav")
-	// f, err := os.Open("counting.wav")
-	if err != nil {
-		log.Fatal(err)
-	}
+	sampleRate := beep.SampleRate(44100)
+	speaker.Init(sampleRate, sampleRate.N(time.Second/10))
 
-	streamer, format, err := wav.Decode(f)
-	if err != nil {
-		log.Fatal(err)
-	}
+	chains := make([]*Chain, 2)
+	chains[0] = NewChain(sampleRate)
+	chains[1] = NewChain(sampleRate)
 
-	buffer := beep.NewBuffer(format)
-	buffer.Append(streamer)
-	streamer.Close()
-
-	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
-
-	chain := NewChain(*buffer, 8)
+	chains[0].LoadSound("samples/breaks/Intelligent Junglist.wav", 8)
+	chains[1].LoadSound("samples/counting.wav", 8)
 
 	for {
 		cmd := <-c
 
-		commandEffects := ParseCommand(cmd)
+		chainIdx, effects := ParseCommand(cmd)
+		if chainIdx < 0 || chainIdx > len(chains) {
+			fmt.Printf("Chain %d does not exist.\n", chainIdx)
+			continue
+		}
+
+		chain := chains[chainIdx]
 
 		speaker.Lock()
-		for _, effect := range commandEffects {
+		for _, effect := range effects {
 			effect(chain)
 		}
 		speaker.Unlock()

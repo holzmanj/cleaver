@@ -1,9 +1,13 @@
 package main
 
 import (
+	"log"
+	"os"
+
 	"github.com/faiface/beep"
 	"github.com/faiface/beep/effects"
 	"github.com/faiface/beep/speaker"
+	"github.com/faiface/beep/wav"
 )
 
 /*
@@ -23,10 +27,10 @@ type Chain struct {
 	vol   *effects.Volume
 }
 
-func NewChain(buf beep.Buffer, nchops int) *Chain {
-	ch := NewChoppedSound(buf, nchops)
+func NewChain(sr beep.SampleRate) *Chain {
+	ch := &ChoppedSound{sampleRate: sr, buf: nil, boundaries: make([]int, 0), activeChop: beep.Silence(-1)}
 	rs := beep.ResampleRatio(4, 1.0, ch)
-	mn := NewMincer(rs, buf.Format())
+	mn := NewMincer(rs, sr)
 	pn := &effects.Pan{Streamer: mn, Pan: 0}
 	vl := &effects.Volume{Streamer: pn, Base: 2, Volume: 0, Silent: false}
 
@@ -39,6 +43,25 @@ func NewChain(buf beep.Buffer, nchops int) *Chain {
 		pan:   pn,
 		vol:   vl,
 	}
+}
+
+func (c *Chain) LoadSound(path string, nChops int) {
+	f, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	streamer, format, err := wav.Decode(f)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	buffer := beep.NewBuffer(format)
+	buffer.Append(streamer)
+	streamer.Close()
+
+	c.chops.SetSound(buffer)
+	c.chops.Rechop(nChops)
 }
 
 func (c *Chain) PlayChop(i int) {
@@ -81,24 +104,15 @@ CHOPPED SOUND
 Keeps a buffer of the entire sound and the boundary positions of some number of chops.
 */
 type ChoppedSound struct {
-	buf        beep.Buffer
+	sampleRate beep.SampleRate
+	buf        *beep.Buffer
 	boundaries []int
 	activeChop beep.Streamer
 }
 
-func NewChoppedSound(buf beep.Buffer, nChops int) *ChoppedSound {
-	// generate evenly spaced chop boundaries by default
-	bounds := make([]int, nChops+1)
-	var slen float32 = float32(buf.Len()) / float32(nChops)
-	for i := range bounds {
-		bounds[i] = i * int(slen)
-	}
-
-	return &ChoppedSound{
-		buf:        buf,
-		boundaries: bounds,
-		activeChop: beep.Silence(-1),
-	}
+func (cs *ChoppedSound) SetSound(buf *beep.Buffer) {
+	cs.buf = buf
+	cs.Rechop(1)
 }
 
 // changes the number of chops of the original sound sample
@@ -113,11 +127,19 @@ func (cs *ChoppedSound) Rechop(nChops int) {
 
 // plays the chop of index (i % num chops), cutting off any currently playing chop
 func (cs *ChoppedSound) PlayChop(i int) {
+	if cs.buf == nil {
+		cs.activeChop = beep.Silence(-1)
+		return
+	}
+
 	i = i % (len(cs.boundaries) - 1)
 	start := cs.boundaries[i]
 	end := cs.boundaries[i+1]
 
-	cs.activeChop = cs.buf.Streamer(start, end)
+	raw := cs.buf.Streamer(start, end)
+	resampled := beep.Resample(4, cs.buf.Format().SampleRate, cs.sampleRate, raw)
+
+	cs.activeChop = resampled
 }
 
 func (cs *ChoppedSound) Stream(samples [][2]float64) (n int, ok bool) {
@@ -162,10 +184,10 @@ type Mincer struct {
 	intervalPos int
 }
 
-func NewMincer(streamer beep.Streamer, format beep.Format) *Mincer {
+func NewMincer(streamer beep.Streamer, sr beep.SampleRate) *Mincer {
 	return &Mincer{
 		streamer:    streamer,
-		sampleRate:  format.SampleRate,
+		sampleRate:  sr,
 		buf:         make([][2]float64, 0),
 		refillBuf:   true,
 		bufPos:      0,
