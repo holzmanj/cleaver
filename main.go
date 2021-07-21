@@ -10,10 +10,11 @@ import (
 	"github.com/faiface/beep/speaker"
 )
 
-const UDP_PORT = 34567
+const WEBSERVER_PORT = 7775
+const UDP_PORT = 7776
 const BUF_SIZE = 16
 
-func listenUDPMessages(c chan string) {
+func runUDPListener(c chan string) {
 	pc, err := net.ListenPacket("udp", fmt.Sprintf(":%d", UDP_PORT))
 	if err != nil {
 		log.Fatal(err)
@@ -34,23 +35,27 @@ func listenUDPMessages(c chan string) {
 func main() {
 	c := make(chan string)
 
-	go listenUDPMessages(c)
+	go runUDPListener(c)
+	go runWebServer(WEBSERVER_PORT)
 
 	sampleRate := beep.SampleRate(44100)
 	speaker.Init(sampleRate, sampleRate.N(time.Second/10))
 
-	chains := make([]*Chain, 2)
-	chains[0] = NewChain(sampleRate)
-	chains[1] = NewChain(sampleRate)
+	chains := make([]*Chain, 4)
+	for i := range chains {
+		chains[i] = NewChain(sampleRate)
+	}
 
 	chains[0].LoadSound("samples/breaks/Intelligent Junglist.wav", 8)
-	chains[1].LoadSound("samples/counting.wav", 8)
+	chains[1].LoadSound("samples/breaks/music is so special.wav", 8)
+	chains[2].LoadSound("samples/a# plucks.wav", 4)
+	chains[3].LoadSound("samples/a# bass.wav", 4)
 
 	for {
 		cmd := <-c
 
 		chainIdx, effects := ParseCommand(cmd)
-		if chainIdx < 0 || chainIdx > len(chains) {
+		if chainIdx < 0 || chainIdx >= len(chains) {
 			fmt.Printf("Chain %d does not exist.\n", chainIdx)
 			continue
 		}
