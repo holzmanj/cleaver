@@ -4,13 +4,13 @@
     --color0: #0f052d;
     --color1: #203671;
     --color2: #36868f;
-    --color4: #5fc75d;
+    --color3: #5fc75d;
     --color-error: red;
 }
 
 body {
     background-color: var(--color0);
-    color: var(--color4);
+    color: var(--color3);
     font-family: 'Share Tech Mono', monospace;
 }
 
@@ -19,22 +19,67 @@ body {
 }
 
 #center-column {
-    outline: 1px solid var(--color1);
-    height: 100px;
     max-width: 500px;
-    width: 100%;
 }
 
 #add-sound-button {
-    color: var(--color1);
-    font-size: 56pt;
-    cursor: pointer;
-    display: inline;
+    background: var(--color0);
+    border: 1px solid var(--color3);
+    border-radius: 3px;
 
-    border: 1px solid red;
-    text-shadow: #36868f;
+    font-family: inherit;
+    font-size: 16px;
+    color: var(--color3);
+
+    padding: 5px;
+    margin: 8px;
+    width: 100%;
+    cursor: pointer;
 }
 
 #add-sound-button:hover {
-    color: var(--color2);
+    color: var(--color0);
+    border-color: var(--color0);
+    background: var(--color3);
+}
+
+#new-sound-picker {
+    display: none;
+}
+
+.sound-card {
+    border: 1px solid var(--color0);
+    border-radius: 3px;
+    margin: 8px;
+    display: flex;
+    width: 100%;
+}
+
+.sound-card:hover {
+    border-color: var(--color3);
+}
+
+.sound-card-left {
+    width: 28px;
+    text-align: center;
+}
+
+.sound-card-right {
+    width: 100%;
+    text-align: left;
+    display: table;
+}
+
+.sound-card-index {
+    display: inline-block;
+    vertical-align: middle;
+    line-break: normal;
+}
+
+.sound-card-path, .sound-card-effects {
+    display: table-row;
+}
+
+.effect-value::after {
+    content: " ";
 }

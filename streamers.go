@@ -20,11 +20,23 @@ ChoppedSound -> Resampler -> Mincer -> Pan -> Volume
 */
 
 type Chain struct {
-	chops *ChoppedSound
-	speed *beep.Resampler
-	mince *Mincer
-	pan   *effects.Pan
-	vol   *effects.Volume
+	Config ChainConfig
+	chops  *ChoppedSound
+	speed  *beep.Resampler
+	mince  *Mincer
+	pan    *effects.Pan
+	vol    *effects.Volume
+}
+
+type ChainConfig struct {
+	SoundPath     string `json:"path"`
+	NumChops      int    `json:"chops"`
+	SpeedN        int    `json:"speedN"`
+	SpeedD        int    `json:"speedD"`
+	MinceSize     int    `json:"minceSize"`
+	MinceInterval int    `json:"minceInterval"`
+	Pan           int    `json:"pan"`
+	Volume        int    `json:"volume"`
 }
 
 func NewChain(sr beep.SampleRate) *Chain {
@@ -37,6 +49,7 @@ func NewChain(sr beep.SampleRate) *Chain {
 	speaker.Play(vl)
 
 	return &Chain{
+		
 		chops: ch,
 		speed: rs,
 		mince: mn,
@@ -56,6 +69,9 @@ func (c *Chain) LoadSound(path string, nChops int) {
 		log.Fatal(err)
 	}
 
+	c.Config.SoundPath = path
+	c.Config.NumChops = nChops
+
 	buffer := beep.NewBuffer(format)
 	buffer.Append(streamer)
 	streamer.Close()
@@ -70,32 +86,42 @@ func (c *Chain) PlayChop(i int) {
 
 func (c *Chain) RechopSound(nChops int) {
 	c.chops.Rechop(nChops)
+	c.Config.NumChops = nChops
 }
 
-func (c *Chain) SetSpeed(ratio float64) {
-	c.speed.SetRatio(ratio)
+func (c *Chain) SetSpeed(n, d int) {
+	c.speed.SetRatio(float64(n) / float64(d))
+	c.Config.SpeedN = n
+	c.Config.SpeedD = d
 }
 
 func (c *Chain) Remince(size, interval int) {
 	c.mince.LoadNewBuffer(size, interval)
+	c.Config.MinceSize = size
+	c.Config.MinceInterval = interval
 }
 
-func (c *Chain) SetPan(ratio float64) {
+func (c *Chain) SetPan(val int) {
+	ratio := 1.0
+	if val < 32 {
+		ratio = float64(val-16) / 32
+	}
 	c.pan.Pan = ratio
+	c.Config.Pan = val
 }
 
-// set the volume of the chain
-// expects a float in range [0, 1] where 0 is muted, and 1.0 is full volume
-func (c *Chain) SetVolume(vol float64) {
-	if vol <= 0 {
+func (c *Chain) SetVolume(val int) {
+	if val <= 0 {
 		c.vol.Silent = true
 	} else {
-		if vol > 1 {
-			vol = 1
+		if val >= 32 {
+			c.vol.Volume = 0
+		} else {
+			c.vol.Volume = float64(val)*3/16 - 6
 		}
 		c.vol.Silent = false
-		c.vol.Volume = -((1 - vol) * 6)
 	}
+	c.Config.Volume = val
 }
 
 /*

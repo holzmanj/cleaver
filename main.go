@@ -14,6 +14,8 @@ const WEBSERVER_PORT = 7775
 const UDP_PORT = 7776
 const BUF_SIZE = 16
 
+var Chains []*Chain
+
 func runUDPListener(c chan string) {
 	pc, err := net.ListenPacket("udp", fmt.Sprintf(":%d", UDP_PORT))
 	if err != nil {
@@ -41,31 +43,33 @@ func main() {
 	sampleRate := beep.SampleRate(44100)
 	speaker.Init(sampleRate, sampleRate.N(time.Second/10))
 
-	chains := make([]*Chain, 4)
-	for i := range chains {
-		chains[i] = NewChain(sampleRate)
+	Chains = make([]*Chain, 4)
+	for i := range Chains {
+		Chains[i] = NewChain(sampleRate)
 	}
 
-	chains[0].LoadSound("samples/breaks/Intelligent Junglist.wav", 8)
-	chains[1].LoadSound("samples/breaks/music is so special.wav", 8)
-	chains[2].LoadSound("samples/a# plucks.wav", 4)
-	chains[3].LoadSound("samples/a# bass.wav", 4)
+	Chains[0].LoadSound("samples/breaks/Intelligent Junglist.wav", 8)
+	Chains[1].LoadSound("samples/breaks/music is so special.wav", 8)
+	Chains[2].LoadSound("samples/a# strings.wav", 2)
+	Chains[3].LoadSound("samples/a# bass.wav", 4)
 
 	for {
 		cmd := <-c
 
 		chainIdx, effects := ParseCommand(cmd)
-		if chainIdx < 0 || chainIdx >= len(chains) {
+		if chainIdx < 0 || chainIdx >= len(Chains) {
 			fmt.Printf("Chain %d does not exist.\n", chainIdx)
 			continue
 		}
 
-		chain := chains[chainIdx]
+		chain := Chains[chainIdx]
 
 		speaker.Lock()
 		for _, effect := range effects {
 			effect(chain)
 		}
 		speaker.Unlock()
+
+		PushChainConfigs()
 	}
 }

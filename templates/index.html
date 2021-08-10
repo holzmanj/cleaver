@@ -10,11 +10,12 @@
 </head>
 
 <body>
-    <h1 id="header">PSYN 毒</h1>
-    <center>
-        <div id="center-column"></div>
-        <div id="add-sound-button">+</div>
-    </center>
+    <h1 id="header">PSYN</h1>
+    <table id="center-column">
+        <div id="sound-card-wrapper"></div>
+        <button id="add-sound-button" onclick="pickNewSoundFile();">ADD NEW SOUND</button>
+    </table>
+    <input type="file" id="new-sound-picker" accept="audio/wav">
 </body>
 
 </html>

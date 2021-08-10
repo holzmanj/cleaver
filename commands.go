@@ -142,7 +142,7 @@ func ParseCommand(cmd string) (int, []func(*Chain)) {
 		}
 
 		commandEffects = append(commandEffects, func(c *Chain) {
-			c.SetSpeed(float64(n) / float64(d))
+			c.SetSpeed(n, d)
 		})
 	}
 
@@ -177,16 +177,8 @@ func ParseCommand(cmd string) (int, []func(*Chain)) {
 			return chain, commandEffects
 		}
 
-		// convert from integer in range [0-32] to float in range [-1,1]
-		var ratio float64
-		if p >= 32 {
-			ratio = 1
-		} else {
-			ratio = float64(p-16) / 32
-		}
-
 		commandEffects = append(commandEffects, func(c *Chain) {
-			c.SetPan(ratio)
+			c.SetPan(p)
 		})
 	}
 
@@ -199,16 +191,8 @@ func ParseCommand(cmd string) (int, []func(*Chain)) {
 			return chain, commandEffects
 		}
 
-		// convert from integer in range [0-32] to float in range [0, 1]
-		ratio := 0.0
-		if v >= 32 {
-			ratio = 1.0
-		} else {
-			ratio = float64(v) / 32.0
-		}
-
 		commandEffects = append(commandEffects, func(c *Chain) {
-			c.SetVolume(ratio)
+			c.SetVolume(v)
 		})
 	}
 

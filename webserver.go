@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"text/template"
 
 	"github.com/gorilla/websocket"
@@ -10,6 +12,11 @@ import (
 
 type TemplateData struct {
 	Port int
+}
+
+type ConnList struct {
+	conns []*websocket.Conn
+	mut   sync.Mutex
 }
 
 var upgrader = websocket.Upgrader{
@@ -21,11 +28,64 @@ var templates *template.Template
 
 var templateData TemplateData
 
-func indexEndpoint(w http.ResponseWriter, r *http.Request) {
-	templates.ExecuteTemplate(w, "index.html", templateData)
+var activeConnections ConnList
+
+func dumpChainConfigs() []byte {
+	var configs []ChainConfig
+	for _, chain := range Chains {
+		configs = append(configs, chain.Config)
+	}
+
+	bytes, err := json.Marshal(configs)
+	if err != nil {
+		fmt.Println(err)
+		return []byte(`{"error": "failed to dump chain configs to json"}`)
+	}
+	return bytes
 }
 
-func handleWebsocketConn(conn *websocket.Conn) {
+func PushChainConfigs() {
+	activeConnections.mut.Lock()
+	for _, conn := range activeConnections.conns {
+		conn.WriteMessage(websocket.TextMessage, dumpChainConfigs())
+	}
+	activeConnections.mut.Unlock()
+}
+
+func addActiveConnection(conn *websocket.Conn) {
+	activeConnections.mut.Lock()
+	activeConnections.conns = append(activeConnections.conns, conn)
+	activeConnections.mut.Unlock()
+}
+
+func removeActiveConnection(conn *websocket.Conn) {
+	activeConnections.mut.Lock()
+	defer activeConnections.mut.Unlock()
+
+	// find index of conn in active connections
+	i := -1
+	for ci := range activeConnections.conns {
+		if conn == activeConnections.conns[ci] {
+			i = ci
+			break
+		}
+	}
+
+	// conn wasn't found in active connections list
+	if i == -1 {
+		return
+	}
+
+	// remove item
+	activeConnections.conns[i] = activeConnections.conns[len(activeConnections.conns)-1]
+	activeConnections.conns = activeConnections.conns[:len(activeConnections.conns)-1]
+}
+
+func handleSocketConn(conn *websocket.Conn) {
+	addActiveConnection(conn)
+	defer removeActiveConnection(conn)
+
+	conn.WriteMessage(websocket.TextMessage, dumpChainConfigs())
 	for {
 		msgType, p, err := conn.ReadMessage()
 		if err != nil {
@@ -44,7 +104,11 @@ func handleWebsocketConn(conn *websocket.Conn) {
 	}
 }
 
-func websocketEndpoint(w http.ResponseWriter, r *http.Request) {
+func indexEndpoint(w http.ResponseWriter, r *http.Request) {
+	templates.ExecuteTemplate(w, "index.html", templateData)
+}
+
+func socketEndpoint(w http.ResponseWriter, r *http.Request) {
 	// for now accept any type of inconming connection
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
@@ -53,7 +117,7 @@ func websocketEndpoint(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 
-	handleWebsocketConn(wsConn)
+	handleSocketConn(wsConn)
 }
 
 func runWebServer(port int) {
@@ -67,7 +131,7 @@ func runWebServer(port int) {
 
 	// initialize endpoint handlers
 	http.HandleFunc("/", indexEndpoint)
-	http.HandleFunc("/socket", websocketEndpoint)
+	http.HandleFunc("/socket", socketEndpoint)
 	http.Handle("/static/", http.StripPrefix("/static", fs))
 
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
