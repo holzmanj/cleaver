@@ -103,8 +103,8 @@ func (c *Chain) Remince(size, interval int) {
 
 func (c *Chain) SetPan(val int) {
 	ratio := 1.0
-	if val < 32 {
-		ratio = float64(val-16) / 32
+	if val <= 32 {
+		ratio = float64(val-16) / 16
 	}
 	c.pan.Pan = ratio
 	c.Config.Pan = val
